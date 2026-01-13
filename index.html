@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Plan</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script src="data.js"></script>
+
+    <style>
+        body {
+            font-family: 'VT323', monospace;
+            /* Changed to a deep Teal for that 90s gym mat vibe */
+            background-color: #115e59;
+            background-image:  radial-gradient(#2dd4bf 0.5px, transparent 0.5px), 
+                            radial-gradient(#2dd4bf 0.5px, #115e59 0.5px);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+            /* Add a subtle scanline overlay */
+            background-attachment: fixed;
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #115e59; }
+        ::-webkit-scrollbar-thumb { background: #b1880e; border: 2px solid #115e59; }
+
+        .scroll-touch {
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 2px solid #000;
+            box-shadow: 8px 8px 0px rgba(0,0,0,0.5);
+        }
+
+        .btn-pixel {
+            box-shadow: 2px 2px 0px #000;
+            transition: all 0.1s;
+        }
+        .btn-pixel:active {
+            transform: translate(2px, 2px);
+            box-shadow: 0px 0px 0px #000;
+        }
+
+        .cat-header {
+            font-family: sans-serif;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #5eead4; /* Bright Teal text for headers inside dark areas, or gray in light */
+            text-shadow: 1px 1px 0 #000;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            padding-left: 4px;
+            background: #134e4a;
+            display: inline-block;
+            padding: 2px 6px;
+            border: 1px solid black;
+            box-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+        }
+
+        .item-done {
+            color: #9ca3af;
+            text-decoration: line-through;
+            background-color: rgba(0,0,0,0.05);
+        }
+        
+        .item-done img {
+            filter: grayscale(100%);
+            opacity: 0.5;
+        }
+
+        #sidebar {
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar.open { transform: translateX(0); }
+        
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .pop-anim { animation: pop 0.2s ease; }
+
+        .memo-bubble {
+            position: absolute;
+            bottom: 110%; 
+            right: 0;
+            background: #ccfbf1; /* Teal-50 */
+            border: 2px solid #000;
+            padding: 0.5rem;
+            width: 200px;
+            z-index: 50;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.2);
+            font-family: sans-serif;
+            font-size: 0.85rem;
+            line-height: 1.3;
+            color: #134e4a;
+            display: none; 
+            white-space: normal;
+        }
+        .memo-bubble.show {
+            display: block;
+            animation: pop 0.1s ease;
+        }
+        .memo-bubble::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            right: 10px;
+            border-width: 6px;
+            border-style: solid;
+            border-color: #000 transparent transparent transparent;
+        }
+    </style>
+</head>
+<body class="h-[100dvh] w-screen overflow-hidden text-gray-900 relative" onclick="handleBodyClick(event)">
+
+    <div class="relative z-10 w-full h-full max-w-md mx-auto p-4 flex flex-col">
+        <header class="flex justify-between items-center mb-6 pt-2">
+            <div>
+                <h1 class="text-4xl leading-none italic text-white drop-shadow-[3px_3px_0_rgba(0,0,0,1)] tracking-wide">
+                    WORK<span class="text-teal-300">OUT</span>
+                </h1>
+            </div>
+            <div class="flex gap-2">
+                <button id="mute-btn" onclick="toggleMute()" class="btn-pixel bg-teal-800 text-white p-3 border-2 border-black">
+                    <i data-lucide="volume-2" id="mute-icon" class="w-8 h-8"></i>
+                </button>
+                <button onclick="toggleSidebar()" class="btn-pixel bg-teal-500 hover:bg-teal-400 text-white p-3 border-2 border-black">
+                    <i data-lucide="dumbbell" class="w-8 h-8"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="glass-panel flex-1 overflow-y-auto p-4 rounded-none scroll-touch">
+            <div id="rotation-list" class="space-y-2"></div>
+        </main>
+    </div>
+
+    <aside id="sidebar" class="absolute inset-y-0 right-0 w-full max-w-sm bg-[#f0fdfa] border-l-4 border-black z-50 flex flex-col shadow-2xl h-full">
+        
+        <div class="bg-teal-600 p-4 border-b-4 border-black flex justify-between items-center shrink-0">
+            <h2 class="text-2xl text-white">Exercise Repo</h2>
+            <button onclick="toggleSidebar()" class="text-white hover:text-teal-200">
+                <i data-lucide="x" class="w-8 h-8"></i>
+            </button>
+        </div>
+
+        <div class="p-4 bg-teal-100 border-b-4 border-teal-200 shrink-0">
+            
+            <div class="flex gap-2 mb-2 items-center">
+                <button id="icon-cycler" onclick="cycleNewIcon()" class="w-12 h-12 bg-white border-2 border-black flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-gray-50 active:translate-y-1">
+                    <img id="preview-icon" src="" class="w-8 h-8">
+                </button>
+                <input type="text" id="new-item-name" placeholder="Exercise Name..." 
+                    class="flex-1 p-2 border-2 border-black font-sans text-lg focus:outline-none focus:ring-2 focus:ring-teal-500 h-12">
+            </div>
+
+            <input type="text" id="new-item-note" placeholder="Sets / Reps / Weight (e.g. 3x10)" 
+                class="w-full p-2 mb-2 border-2 border-black font-sans text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 h-10">
+            
+            <div class="flex flex-wrap gap-2 mb-2" id="category-selector"></div>
+            
+            <button onclick="addToRepository()" class="btn-pixel w-full bg-pink-500 text-white border-2 border-black py-2 text-xl hover:bg-pink-600">
+                SAVE TO REPO
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 pb-24 bg-[#e0f2fe] scroll-touch overscroll-contain">
+            <div id="repo-list" class="space-y-4"></div>
+        </div>
+    </aside>
+
+    <div id="overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-40 hidden backdrop-blur-sm"></div>
+
+    <audio id="sfx-plop" src="assets/sfx/plop.wav"></audio>
+    <audio id="sfx-scratch" src="assets/sfx/scratch.wav"></audio>
+    <audio id="sfx-add-rot" src="assets/sfx/add.wav"></audio>
+    <audio id="sfx-delete" src="assets/sfx/delete.wav"></audio>
+    <audio id="sfx-success" src="assets/sfx/success.wav"></audio>
+
+    <script>
+        // Updated Categories
+        const CATEGORIES = ['Strength', 'Mobility', 'Stretch', 'Misc'];
+        let state = { repository: [], rotation: [] };
+        let selectedCategory = 'Strength';
+        let currentIconIndex = 0; 
+        let isMuted = localStorage.getItem('workoutPlannerMuted') === 'true';
+        let activeMemoId = null; 
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            updateMuteUI();
+            renderCategoryButtons();
+            updateIconPreview(); 
+            renderAll();
+        });
+
+        function handleBodyClick(event) {
+            if (!event.target.closest('.memo-btn') && !event.target.closest('.memo-bubble')) {
+                closeActiveMemo();
+            }
+        }
+
+        function closeActiveMemo() {
+            if (activeMemoId) {
+                const bubble = document.getElementById('memo-' + activeMemoId);
+                if(bubble) bubble.classList.remove('show');
+                activeMemoId = null;
+            }
+        }
+
+        function toggleMemo(event, rotId) {
+            event.stopPropagation(); 
+            if (activeMemoId === rotId) {
+                closeActiveMemo();
+                return;
+            }
+            closeActiveMemo();
+            const bubble = document.getElementById('memo-' + rotId);
+            if(bubble) {
+                bubble.classList.add('show');
+                activeMemoId = rotId;
+                playSfx('plop');
+            }
+        }
+
+        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substr(2); }
+
+        function saveState() {
+            localStorage.setItem('workoutPlannerState_v1', JSON.stringify(state));
+            renderAll();
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('workoutPlannerState_v1');
+            if (saved) state = JSON.parse(saved);
+        }
+
+        function updateMuteUI() {
+            const icon = document.getElementById('mute-icon');
+            const btn = document.getElementById('mute-btn');
+            if (isMuted) {
+                icon.setAttribute('data-lucide', 'volume-x');
+                btn.classList.add('bg-red-900'); btn.classList.remove('bg-teal-800');
+            } else {
+                icon.setAttribute('data-lucide', 'volume-2');
+                btn.classList.add('bg-teal-800'); btn.classList.remove('bg-red-900');
+            }
+            lucide.createIcons();
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            localStorage.setItem('workoutPlannerMuted', isMuted);
+            updateMuteUI();
+            if (!isMuted) playSfx('plop');
+        }
+
+        function playSfx(type) {
+            if (isMuted) return;
+            const audio = document.getElementById('sfx-' + type);
+            if (audio) { audio.volume = 0.2; audio.currentTime = 0; audio.play().catch(e => {}); }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('open');
+            if (sidebar.classList.contains('open')) {
+                overlay.classList.remove('hidden');
+                playSfx('plop');
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function setCategory(cat) {
+            selectedCategory = cat; currentIconIndex = 0; 
+            renderCategoryButtons(); updateIconPreview(); playSfx('plop');
+        }
+
+        function cycleNewIcon() {
+            currentIconIndex++; updateIconPreview();
+            const img = document.getElementById('preview-icon');
+            img.classList.remove('pop-anim'); void img.offsetWidth; img.classList.add('pop-anim');
+        }
+
+        function updateIconPreview() {
+            if(typeof getIconUrl === 'function') {
+                document.getElementById('preview-icon').src = getIconUrl(selectedCategory, currentIconIndex);
+            }
+        }
+
+        function addToRepository() {
+            const nameIn = document.getElementById('new-item-name');
+            const noteIn = document.getElementById('new-item-note');
+            const name = nameIn.value.trim();
+            if (!name) return;
+
+            state.repository.push({
+                id: generateId(),
+                name: name,
+                note: noteIn.value.trim(),
+                category: selectedCategory,
+                iconIndex: currentIconIndex 
+            });
+
+            nameIn.value = ''; noteIn.value = '';
+            currentIconIndex = 0; 
+            updateIconPreview();
+            saveState();
+            playSfx('success');
+        }
+
+        function deleteFromRepository(id) {
+            if(!confirm("Delete this exercise permanently?")) return;
+            state.repository = state.repository.filter(item => item.id !== id);
+            saveState(); playSfx('delete');
+        }
+
+        // Feature request: Ability to update note in repo
+        function editRepositoryItem(id) {
+            const item = state.repository.find(i => i.id === id);
+            
+            // We use the existing prompt logic, pre-filling with current values
+            const newName = prompt("Edit Exercise Name:", item.name);
+            if (newName === null) return; // User cancelled
+            
+            const newNote = prompt("Edit Note (Sets/Reps/Weight):", item.note || "");
+            
+            item.name = newName.trim() || item.name;
+            item.note = (newNote !== null) ? newNote.trim() : item.note;
+            
+            saveState();
+        }
+
+        function addToRotation(repoId) {
+            const repoItem = state.repository.find(item => item.id === repoId);
+            if (!repoItem) return;
+            
+            // Add to active list
+            state.rotation.push({
+                rotId: generateId(),
+                name: repoItem.name,
+                note: repoItem.note, // Inherits latest note from repo
+                category: repoItem.category,
+                iconIndex: repoItem.iconIndex || 0, 
+                cooked: false // 'cooked' is basically 'done'
+            });
+            saveState(); playSfx('add-rot');
+        }
+
+        function removeFromRotation(rotId) {
+            state.rotation = state.rotation.filter(item => item.rotId !== rotId);
+            saveState(); playSfx('delete');
+        }
+
+        function toggleDone(rotId) {
+            const item = state.rotation.find(i => i.rotId === rotId);
+            if (item) { item.cooked = !item.cooked; saveState(); playSfx('scratch'); }
+        }
+
+        function renderCategoryButtons() {
+            const container = document.getElementById('category-selector');
+            container.innerHTML = CATEGORIES.map(cat => `
+                <button onclick="setCategory('${cat}')" 
+                    class="px-3 py-1 border-2 border-black text-sm uppercase ${selectedCategory === cat ? 'bg-teal-500 text-white' : 'bg-white text-gray-700'}">
+                    ${cat}
+                </button>
+            `).join('');
+        }
+
+        function renderAll() { renderRotation(); renderRepository(); lucide.createIcons(); }
+
+        function formatNoteContent(note) {
+            if (note.startsWith('http')) {
+                return `<a href="${note}" target="_blank" class="block bg-teal-500 text-white text-center p-2 rounded hover:bg-teal-600 font-bold">OPEN LINK</a>`;
+            }
+            return note;
+        }
+
+        function renderRotation() {
+            const container = document.getElementById('rotation-list');
+            if (state.rotation.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 mt-10 text-xl px-6">
+                        <p class="mb-4">Your workout is empty.</p>
+                        <p class="text-sm">Click the <i data-lucide="dumbbell" class="inline w-4 h-4"></i> to open your collection, then use (+) to build your session.</p>
+                    </div>`;
+                lucide.createIcons();
+                return;
+            }
+
+            let html = '';
+            CATEGORIES.forEach(cat => {
+                const items = state.rotation.filter(i => i.category === cat);
+                if (items.length > 0) {
+                    html += `<div class="w-full text-left"><div class="cat-header">${cat}</div></div>`;
+                    items.forEach(item => {
+                        const iconUrl = (typeof getIconUrl === 'function') ? getIconUrl(item.category, item.iconIndex || 0) : '';
+                        const hasNote = item.note && item.note.trim() !== "";
+                        
+                        html += `
+                        <div class="flex items-center bg-white border-2 border-black p-2 mb-2 shadow-sm ${item.cooked ? 'item-done' : ''} relative z-0">
+                            <button onclick="toggleDone('${item.rotId}')" class="mr-2 p-1 hover:bg-green-100 rounded">
+                                ${item.cooked ? `<i data-lucide="check-square" class="w-8 h-8 text-teal-600"></i>` : `<i data-lucide="square" class="w-8 h-8 text-gray-400"></i>`}
+                            </button>
+                            
+                            <div class="w-12 h-12 mr-3 flex-shrink-0 flex items-center justify-center border border-gray-100 bg-gray-50"><img src="${iconUrl}" class="w-10 h-10 object-contain"></div>
+                            
+                            <div class="flex-1 min-w-0 leading-tight">
+                                <div class="text-2xl truncate">${item.name}</div>
+                                ${hasNote && !item.cooked ? `<div class="text-xs font-sans text-teal-600 font-bold mt-1">${item.note}</div>` : ''}
+                            </div>
+                            
+                            <div class="flex items-center gap-2 ml-2 relative">
+                                ${hasNote ? `
+                                    <div class="relative">
+                                        <button onclick="toggleMemo(event, '${item.rotId}')" class="memo-btn btn-pixel bg-yellow-100 p-1.5 border border-black hover:bg-yellow-200">
+                                            <i data-lucide="info" class="w-4 h-4 text-yellow-800"></i>
+                                        </button>
+                                        
+                                        <div id="memo-${item.rotId}" class="memo-bubble text-left">
+                                            ${formatNoteContent(item.note)}
+                                        </div>
+                                    </div>
+                                ` : ''}
+
+                                <button onclick="removeFromRotation('${item.rotId}')" class="text-red-400 hover:text-red-600 p-1">
+                                    <i data-lucide="x" class="w-6 h-6"></i>
+                                </button>
+                            </div>
+                        </div>`;
+                    });
+                }
+            });
+            container.innerHTML = html;
+        }
+
+        function renderRepository() {
+            const container = document.getElementById('repo-list');
+            let html = '';
+            CATEGORIES.forEach(cat => {
+                const items = state.repository.filter(i => i.category === cat);
+                if (items.length > 0) {
+                    html += `<div class="w-full text-left"><div class="cat-header">${cat}</div></div>`;
+                    items.forEach(item => {
+                        const iconUrl = (typeof getIconUrl === 'function') ? getIconUrl(item.category, item.iconIndex || 0) : '';
+                        html += `
+                        <div class="flex items-center bg-white border-2 border-black p-2 mb-2 shadow-sm">
+                            <div class="w-10 h-10 border-2 border-gray-300 mr-3 flex-shrink-0 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                <img src="${iconUrl}" class="w-8 h-8 object-contain">
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-xl leading-none truncate">${item.name}</div>
+                                ${item.note ? `<div class="text-[12px] text-teal-600 font-sans truncate pr-2">${item.note}</div>` : ''}
+                            </div>
+                            <div class="flex gap-1 ml-2">
+                                <button onclick="addToRotation('${item.id}')" class="btn-pixel bg-green-100 p-2 border border-black hover:bg-green-200"><i data-lucide="plus" class="w-4 h-4 text-green-700"></i></button>
+                                <button onclick="editRepositoryItem('${item.id}')" class="btn-pixel bg-yellow-100 p-2 border border-black hover:bg-yellow-200"><i data-lucide="edit-2" class="w-4 h-4 text-yellow-700"></i></button>
+                                <button onclick="deleteFromRepository('${item.id}')" class="btn-pixel bg-red-100 p-2 border border-black hover:bg-red-200"><i data-lucide="trash-2" class="w-4 h-4 text-red-700"></i></button>
+                            </div>
+                        </div>`;
+                    });
+                }
+            });
+            container.innerHTML = html || `<div class="text-center text-gray-500 mt-4 font-sans text-sm"><p>Your collection is empty.</p></div>`;
+        }
+    </script>
+</body>
+</html>
